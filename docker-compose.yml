@@ -1,0 +1,66 @@
+services:
+  mysql:
+    image: mysql:8.0.36
+    env_file: ./env/mysql.env
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rede-alura
+  
+  #o que segue após os ":" do app-1 é um alias que serve para
+  #pegar a configuração do app-1 e reproduzir no app-2,
+  #evitando assim repetir toda a configuração manualmente 
+  app-1: &app
+    build:
+      context: .
+    env_file: ./env/app.env
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - rede-alura
+
+  #app-2 referencia o alias criado acima
+  app-2:
+    <<: *app
+  
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    restart: unless-stopped
+    depends_on:
+      - app-1
+      - app-2
+    networks:
+      - rede-alura
+      
+  redis:
+    image: redis:7.2.4
+    restart: unless-stopped
+    networks:
+      - rede-alura
+        
+volumes:
+  db_data:
+    name: java-arq
+    external: true
+    
+networks:
+  rede-alura:
+    driver: bridge
+  
+    
+    
+    
